@@ -1,0 +1,157 @@
+---
+title: "606040209_stats101c_final"
+author: "Masato Ishizuka"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR)
+library(ggplot2)
+library(MASS)
+library(stringr)
+library(ggfortify)
+library(lattice)
+library(tidyverse)
+library(caret)
+require(boot)
+library(mice)
+library(glmnet)
+library(randomForest)
+library(nnet)
+library(cluster)
+library(neuralnet)
+library(randomForest)
+library(datasets)
+library(caret)
+setwd("/Users/tsukasamiyaji/Desktop/R")
+```
+
+```{r}
+
+getwd()
+setwd("/Users/tsukasamiyaji/Desktop/R")
+
+train <- read.csv("TTrainF23.csv")
+test <- read.csv("TTestF23.csv")
+
+head(train)
+head(test)
+
+str(train)
+str(test)
+```
+
+```{r}
+# A) Report the dim of both data sets:
+dim(train)
+dim(test)
+
+# B) Calculate the baseline misclassification error rate in the training data:
+baseline_error_rate <- 1 - sum(train$Survived == "Died") / nrow(train)
+baseline_error_rate
+```
+
+```{r}
+train <- train[,-1]
+test <- test[,-1]
+
+```
+
+
+```{r}
+# C) Create a Bagging Classification model using all predictors:
+set.seed(19872607)
+
+# Convert 'Survived' to a factor variable
+train$Survived <- as.factor(train$Survived)
+
+model_bagging <- randomForest(Survived ~ ., data = train, importance = TRUE)
+
+# Report OOB Error Rate:
+oob_error_rate <- 1 - model_bagging$err.rate[nrow(model_bagging$err.rate), "OOB"]
+oob_error_rate
+
+model_bagging
+```
+
+```{r}
+set.seed(19872607)
+# D) Report the training confusion matrix and misclassification rate:
+predicted_train <- predict(model_bagging, newdata = train)
+conf_matrix_train <- table(Actual = train$Survived, Predicted = predicted_train)
+
+misclassification_rate_train <- 1 - sum(diag(conf_matrix_train)) / sum(conf_matrix_train)
+conf_matrix_train
+misclassification_rate_train
+```
+
+```{r}
+set.seed(19872607)
+# E) Report your testing confusion matrix and your misclassification rate:
+# Assuming your testing data is named 'test' and has the same structure as 'train'
+test$Survived <- as.factor(test$Survived)
+
+predicted_test <- predict(model_bagging, newdata = test)
+conf_matrix_test <- table(Actual = test$Survived, Predicted = predicted_test)
+
+misclassification_rate_test <- 1 - sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
+conf_matrix_test
+misclassification_rate_test
+```
+
+
+```{r}
+# F) List the names of predictors sorted in descending order by their MeanDecreaseAccuracy:
+variable_importance <- importance(model_bagging)
+sorted_importance <- data.frame(variable = rownames(variable_importance), importance = variable_importance[, "MeanDecreaseAccuracy"])
+sorted_importance <- sorted_importance[order(-sorted_importance$importance), ]
+sorted_importance$variable
+
+varImpPlot(model_bagging)
+```
+
+
+```{r}
+# G) Re-create a random forest model, but this time with mtry = 3:
+set.seed(19872607)
+model_rf_mtry3 <- randomForest(Survived ~ ., data = train, mtry = 3)
+
+# Testing Misclassification Rate with mtry = 3:
+predicted_test_mtry3 <- predict(model_rf_mtry3, newdata = test[,-1])
+conf_matrix_test_mtry3 <- table(Actual = test$Survived, Predicted = predicted_test_mtry3)
+
+misclassification_rate_test_mtry3 <- 1 - sum(diag(conf_matrix_test_mtry3)) / sum(conf_matrix_test_mtry3)
+conf_matrix_test_mtry3
+misclassification_rate_test_mtry3
+
+# Maybe you can add improtance = T but prof doenst mention about that....
+```
+
+
+```{r}
+# H) Create a Tree model (No Pruning). Plot your tree model:
+library(rpart)
+set.seed(19872607)
+model_tree <- rpart(Survived ~ ., data = train, method = "class")
+
+# Plot the tree model:
+plot(model_tree)
+text(model_tree)
+
+# Use the tree model to predict the Survived status for the testing data:
+predicted_test_tree <- predict(model_tree, newdata = test, type = "class")
+conf_matrix_test_tree <- table(Actual = test$Survived, Predicted = predicted_test_tree)
+
+# Testing Misclassification Rate with the tree model:
+misclassification_rate_test_tree <- 1 - sum(diag(conf_matrix_test_tree)) / sum(conf_matrix_test_tree)
+conf_matrix_test_tree
+misclassification_rate_test_tree
+
+# If you use tree() instead of rpart(), youll get 0.285 as a misclassification rate !
+```
+
